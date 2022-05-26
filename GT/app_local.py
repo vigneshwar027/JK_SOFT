@@ -49,7 +49,7 @@ conn = pyodbc.connect('Driver={ODBC Driver 17 for SQL Server};'
                       'Server=localhost;'
                       'Database=ReportsAutomation2;'
                       'Trusted_Connection=yes;')
-
+print('check')
 cursor = conn.cursor()
 def fill_color(date_val):
     #print(date_val)
