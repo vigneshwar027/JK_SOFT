@@ -228,8 +228,10 @@ def change_format(date):
                 try:
                     return datetime.strptime(date, "%m/%d/%Y").strftime('%Y-%m-%d')
                 except: 
-                    
-                    return datetime.strptime('', "%m/%d/%Y").strftime('%Y-%m-%d')
+                    try:
+                        return datetime.strptime(date, "%m-%d-%Y").strftime('%Y-%m-%d')
+                    except:
+                        return datetime.strptime('', "%m/%d/%Y").strftime('%Y-%m-%d')
     else:
         return date
 
@@ -1884,9 +1886,9 @@ def process_report(result_filepath, o_xref, p_xref, client_short_name, case_data
 
         #date_columns3 = ['SourceCreatedDate','InactiveDate','ImmigrationStatusExpirationDate','MostRecentI797IssueApprovalDate','I797ExpirationDate','FinalNivDate','CaseSourceCreatedDate','CaseFiledDate','RFEAuditReceivedDate','RFEAuditDueDate','RFEAuditSubmittedDate', 'LastStepCompletedDate','NextStepActionDueDate','PriorityDate','CaseApprovedDate','CaseValidFromDate','CaseExpirationDate','CaseClosedDate','CaseDeniedDate','CaseWithdrawnDate']
         
-        headers3 = ['Petitioner of Primary Beneficiary', 'Beneficiary Type (Employee / Dependent)', 'Email Address', 'Beneficiary Employee Id', 'Beneficiary Last Name', 'Beneficiary First Name', 'Beneficiary Middle Name', 'Primary Beneficiary Last Name', 'Primary Beneficiary First Name', 'Relation', 'Immigration Status (I-94)', 'Immigration Status Expiration Date (I-94)', 'I-797 Expiration Date', 'Final NIV (Maxout) Date', 'Maxout Date Applicability and Note','Case Created Date', 'Case Description', 'Case Filed Date', 'Case Receipt Number','RFE/Audit Received Date', 'RFE/Audit Response Due Date', 'RFE/Audit Response Submitted Date','Primary Case Status','Secondary Case Status', 'Case Comments', 'Case Last Step Completed', 'Case Last Step Completed Date', 'Case Next Step To Be Completed', 'Case Next Step To Be Completed Date', 'Case Priority Date', 'Case Priority Category', 'Case Priority Country','Case Approved Date','GT Representative']
+        headers3 = ['Petitioner of Primary Beneficiary', 'Beneficiary Type (Employee / Dependent)', 'Email Address', 'Beneficiary Employee Id', 'Beneficiary Last Name', 'Beneficiary First Name', 'Beneficiary Middle Name', 'Primary Beneficiary Last Name', 'Primary Beneficiary First Name', 'Relation', 'Immigration Status (I-94)', 'Immigration Status Expiration Date (I-94)', 'I-797 Expiration Date', 'Final NIV (Maxout) Date', 'Maxout Date Applicability and Note','Case Created Date', 'Case Description', 'Case Filed Date', 'Case Receipt Number','RFE/Audit Received Date', 'RFE/Audit Response Due Date', 'Primary Case Status','Secondary Case Status', 'Case Comments', 'Case Last Step Completed', 'Case Last Step Completed Date', 'Case Next Step To Be Completed', 'Case Next Step To Be Completed Date', 'Case Priority Date','Case Approved Date', 'Case Priority Category', 'Case Priority Country','GT Representative']
 
-        headers_table3 = ['Primary_Petitioner','BeneficiaryType','WorkEmail','EmployeeId','LastName','FirstName','MiddleName','PrimaryBeneficiaryLastName','PrimaryBeneficiaryFirstName','RelationType','ImmigrationStatus','ImmigrationStatusExpirationDate','I797ExpirationDate','FinalNivDate','MaxOutDateNote','CaseSourceCreatedDate', 'CaseDescription','CaseFiledDate','ReceiptNumber','RFEAuditReceivedDate','RFEAuditDueDate','RFEAuditSubmittedDate','PrimaryCaseStatus','SecondaryCaseStatus','CaseComments','LastStepCompleted','LastStepCompletedDate','NextStepAction','NextStepActionDueDate','PriorityDate','CaseApprovedDate','PriorityCategory','PriorityCountry','CasePrimaryCaseManager']
+        headers_table3 = ['Primary_Petitioner','BeneficiaryType','WorkEmail','EmployeeId','LastName','FirstName','MiddleName','PrimaryBeneficiaryLastName','PrimaryBeneficiaryFirstName','RelationType','ImmigrationStatus','ImmigrationStatusExpirationDate','I797ExpirationDate','FinalNivDate','MaxOutDateNote','CaseSourceCreatedDate', 'CaseDescription','CaseFiledDate','ReceiptNumber','RFEAuditReceivedDate','RFEAuditDueDate','PrimaryCaseStatus','SecondaryCaseStatus','CaseComments','LastStepCompleted','LastStepCompletedDate','NextStepAction','NextStepActionDueDate','PriorityDate','CaseApprovedDate','PriorityCategory','PriorityCountry','CasePrimaryCaseManager']
 
         date_columns3 = ['ImmigrationStatusExpirationDate', 'I797ExpirationDate', 'FinalNivDate', 'CaseSourceCreatedDate', 'CaseFiledDate', 'LastStepCompletedDate','NextStepActionDueDate','PriorityDate', 'CaseApprovedDate']
         
@@ -1898,14 +1900,14 @@ def process_report(result_filepath, o_xref, p_xref, client_short_name, case_data
 
         #date_columns3 = ['SourceCreatedDate','InactiveDate','ImmigrationStatusExpirationDate','MostRecentI797IssueApprovalDate','I797ExpirationDate','FinalNivDate','CaseSourceCreatedDate','CaseFiledDate','RFEAuditReceivedDate','RFEAuditDueDate','RFEAuditSubmittedDate', 'LastStepCompletedDate','PriorityDate','CaseApprovedDate','CaseValidFromDate','CaseExpirationDate','CaseClosedDate','CaseDeniedDate','CaseWithdrawnDate']
         
-        headers3 = ['Petitioner of Primary Beneficiary', 'Beneficiary Type (Employee / Dependent)', 'Email Address', 'Beneficiary Employee Id', 'Beneficiary Last Name', 'Beneficiary First Name', 'Beneficiary Middle Name', 'Primary Beneficiary Last Name', 'Primary Beneficiary First Name', 'Relation', 'Immigration Status (I-94)', 'Immigration Status Expiration Date (I-94)', 'I-797 Expiration Date', 'Final NIV (Maxout) Date', 'Maxout Date Applicability and Note','Case Created Date', 'Case Description', 'Case Filed Date', 'Case Receipt Number','RFE/Audit Received Date', 'RFE/Audit Response Due Date', 'RFE/Audit Response Submitted Date','Primary Case Status','Secondary Case Status', 'Case Comments', 'Case Last Step Completed', 'Case Last Step Completed Date', 'Case Priority Date', 'Case Priority Category', 'Case Priority Country','Case Approved Date', 'GT Representative']
+        headers3 = ['Petitioner of Primary Beneficiary', 'Beneficiary Type (Employee / Dependent)', 'Email Address', 'Beneficiary Employee Id', 'Beneficiary Last Name', 'Beneficiary First Name', 'Beneficiary Middle Name', 'Primary Beneficiary Last Name', 'Primary Beneficiary First Name', 'Relation', 'Immigration Status (I-94)', 'Immigration Status Expiration Date (I-94)', 'I-797 Expiration Date', 'Final NIV (Maxout) Date', 'Maxout Date Applicability and Note','Case Created Date', 'Case Description', 'Case Filed Date', 'Case Receipt Number','RFE/Audit Received Date', 'RFE/Audit Response Due Date','Primary Case Status','Secondary Case Status', 'Case Comments', 'Case Last Step Completed', 'Case Last Step Completed Date', 'Case Priority Date','Case Approved Date', 'Case Priority Category', 'Case Priority Country', 'GT Representative']
 
-        headers_table3 = ['Primary_Petitioner','BeneficiaryType','WorkEmail','EmployeeId','LastName','FirstName','MiddleName','PrimaryBeneficiaryLastName','PrimaryBeneficiaryFirstName','RelationType','ImmigrationStatus','ImmigrationStatusExpirationDate','I797ExpirationDate','FinalNivDate','MaxOutDateNote','CaseSourceCreatedDate','CaseDescription','CaseFiledDate','ReceiptNumber','RFEAuditReceivedDate','RFEAuditDueDate','RFEAuditSubmittedDate','PrimaryCaseStatus','SecondaryCaseStatus','CaseComments','LastStepCompleted','LastStepCompletedDate','PriorityDate','CaseApprovedDate','PriorityCategory','PriorityCountry','CasePrimaryCaseManager']
+        headers_table3 = ['Primary_Petitioner','BeneficiaryType','WorkEmail','EmployeeId','LastName','FirstName','MiddleName','PrimaryBeneficiaryLastName','PrimaryBeneficiaryFirstName','RelationType','ImmigrationStatus','ImmigrationStatusExpirationDate','I797ExpirationDate','FinalNivDate','MaxOutDateNote','CaseSourceCreatedDate','CaseDescription','CaseFiledDate','ReceiptNumber','RFEAuditReceivedDate','RFEAuditDueDate','PrimaryCaseStatus','SecondaryCaseStatus','CaseComments','LastStepCompleted','LastStepCompletedDate','PriorityDate','CaseApprovedDate','PriorityCategory','PriorityCountry','CasePrimaryCaseManager']
 
         date_columns3 = ['ImmigrationStatusExpirationDate', 'I797ExpirationDate', 'FinalNivDate', 'CaseSourceCreatedDate', 'CaseFiledDate', 'LastStepCompletedDate','PriorityDate', 'CaseApprovedDate']
         
 
-    results_active3 = cursor.execute("SELECT b.*,c.CaseXref,c.SourceCreatedDate as CaseSourceCreatedDate,c.CasePetitionName,\
+    results_active3 = cursor.execute("SELECT b.*,c.CaseXref,c.SourceCreatedDate as      CaseSourceCreatedDate,c.CasePetitionName,\
         c.CaseFiledDate, c.ReceiptNumber,c.ReceiptStatus, c.RFEAuditReceivedDate,c.RFEAuditDueDate, c.RFEAuditSubmittedDate, \
         c.PrimaryCaseStatus, c.SecondaryCaseStatus, c.CaseComments, c.LastStepCompleted, c.LastStepCompletedDate, c.NextStepAction, c.NextStepActionDueDate, c.PriorityDate, c.PriorityCategory, c.PriorityCountry, c.CaseApprovedDate, c.CaseValidFromDate, c.CaseExpirationDate, c.CaseClosedDate, c.CaseDeniedDate, c.CaseWithdrawnDate, c.CasePrimaryCaseManager,\
         o.OrganizationName,p.PetitionerName,p2.PetitionerName as Primary_Petitioner,\
@@ -1919,7 +1921,7 @@ def process_report(result_filepath, o_xref, p_xref, client_short_name, case_data
         LEFT JOIN dbo.Petitioner as p2 on b2.PetitionerId=p2.PetitionerId\
         LEFT JOIN dbo.Organization as o2 on p2.OrganizationId=o2.OrganizationId\
         LEFT JOIN dbo.BeneficiaryEmployment as e on e.BeneficiaryId=b.BeneficiaryId\
-        where (b.IsActive = '1')  and c.CasePetitionName !='LCA & PAF' and "+where_cnd+" and (c.PrimaryCaseStatus='approved' or PrimaryCaseStatus='Approved' or c.PrimaryCaseStatus='closed')  and c.SecondaryCaseStatus!='Case on Hold' ORDER BY b.is_primary_beneficiary DESC, b.LastName ASC ").fetchall()
+        where (b.IsActive = '1')  and c.CasePetitionName !='LCA & PAF' and "+where_cnd+" and (c.PrimaryCaseStatus='approved' or PrimaryCaseStatus='Approved' or c.PrimaryCaseStatus='closed')  and c.SecondaryCaseStatus!='Case on Hold' ORDER BY b.is_primary_beneficiary DESC, b.LastName ASC").fetchall()
     
     results_active_qry3 = "SELECT b.*,c.CaseXref,c.SourceCreatedDate as CaseSourceCreatedDate,c.CasePetitionName,\
         c.CaseFiledDate, c.ReceiptNumber,c.ReceiptStatus, c.RFEAuditReceivedDate,c.RFEAuditDueDate, c.RFEAuditSubmittedDate, \
@@ -1936,6 +1938,7 @@ def process_report(result_filepath, o_xref, p_xref, client_short_name, case_data
         LEFT JOIN dbo.Organization as o2 on p2.OrganizationId=o2.OrganizationId\
         LEFT JOIN dbo.BeneficiaryEmployment as e on e.BeneficiaryId=b.BeneficiaryId\
         where (b.IsActive = '1')  and c.CasePetitionName !='LCA & PAF' and "+where_cnd+" and (c.PrimaryCaseStatus='approved' or PrimaryCaseStatus='Approved' or c.PrimaryCaseStatus='closed')  and c.SecondaryCaseStatus!='Case on Hold' ORDER BY b.is_primary_beneficiary DESC, b.LastName ASC "
+        
     
     df3 = pd.read_sql(results_active_qry3, conn)
     for dfcol in df3.columns:
