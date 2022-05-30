@@ -50,7 +50,7 @@ if ENVIRONMENT == 'PRODUCTION':
     driver_path = os.path.join('C:\ImmiLytics\Automation_UiPath', "chromedriver.exe")
 else:
     conn = pyodbc.connect('Driver={ODBC Driver 17 for SQL Server};'
-                      'Server=DESKTOP-GLMUIDH\SQLEXPRESS;'
+                      'Server=localhost\SQLEXPRESS;'
                       'Database=ReportsAutomation2;'
                       'Trusted_Connection=yes;')
     driver_path = ("chromedriver.exe")
