@@ -33,12 +33,13 @@ from cryptography.fernet import Fernet
 cwd = os.path.dirname(os.path.realpath(__file__))
 os.chdir(cwd)
 
+
+#CHOICES
 DB_ENCRYPTION = 'NO' #YES/NO
 
 fernet_key = b'zJD8OVkFNpd5N4fJw6pqaWiDrvybkselSQ0fF9SwXfw='
 fernet = Fernet(fernet_key)
 
-#'Server=localhost\SQLEXPRESS;'
 conn = pyodbc.connect('Driver={ODBC Driver 17 for SQL Server};'
                       'Server=localhost\SQLEXPRESS;'
                       'Database=KILP_NEW;'

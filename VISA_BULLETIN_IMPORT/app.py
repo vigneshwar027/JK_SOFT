@@ -66,11 +66,10 @@ def import_data_to_db(file):
 
             cursor.commit()
                
-    print('All data imported into DB')   
 
 def changes_to_db_tables():
 
-    tables = ['VisaBulletinData']
+    tables = ['[dbo].[VisaBulletinData]']
     for  table in tables:
         table_columns = cursor.execute('''
         SELECT name FROM sys.columns WHERE object_id = OBJECT_ID('{}')
@@ -78,16 +77,19 @@ def changes_to_db_tables():
         # the above query gives the list of columns as a queryset
 
         for i in range(len(table_columns)):     
-            try:      
-                cursor.execute('''UPDATE {}
-                SET {} = REPLACE({}, 'nan & .0','')'''.format(table,table_columns[i].name,table_columns[i].name))
-                cursor.commit()
-            except:
-                pass
+            cursor.execute('''UPDATE {}
+                SET {} = NULL WHERE {} = 'nan' '''.format(table,table_columns[i].name,table_columns[i].name))
+            cursor.commit()
+            print(table,table_columns[i].name)
+                  
+            cursor.execute('''UPDATE {}
+            SET {} = REPLACE({}, '.0','')'''.format(table,table_columns[i].name,table_columns[i].name))
+            cursor.commit()
+        
 
             
 def export_to_excel():
-    query = '''select * from VisaBulletinData'''
+    query = '''select * from VisaBulletinData'''    
     df = pd.read_sql(query,conn)
     for d_h in list(df.columns):
         # if d_h =='Visa_Bulletin_Month_and_Year' or d_h =='Priority_Date':
@@ -110,4 +112,5 @@ def start():
 
 start()
 changes_to_db_tables()
-#export_to_excel()
+export_to_excel()
+print('\nCode Execution Completed - All data imported into DB')   
