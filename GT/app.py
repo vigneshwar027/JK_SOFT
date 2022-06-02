@@ -9,6 +9,7 @@ import chardet
 from xlsxwriter import Workbook
 import glob
 
+
 from openpyxl import formatting, styles, Workbook as openpyxl_workbook, load_workbook
 from openpyxl.styles import Alignment, Border, Side, Font, PatternFill, colors
 from openpyxl.styles.colors import Color, ColorDescriptor
@@ -34,8 +35,8 @@ cwd = os.path.dirname(os.path.realpath(__file__))
 os.chdir(cwd)
 
 #choices
-ENVIRONMENT = 'PRODUCTION' #DEVELOPMENT/PRODUCTION
-SEND_MAIL = 'NO' #YES/NO
+ENVIRONMENT = 'DEVELOPMENT' #DEVELOPMENT/PRODUCTION
+SEND_MAIL = 'YES' #YES/NO
 SEND_MAIL_TO_CLIENT = 'NO' #YES/NO
 DB_ENCRYPTION = 'NO' #YES/NO
 
@@ -107,6 +108,13 @@ def truncate_all():
     truncate table [Petitioner];\
     truncate table [Organization];")
     cursor.commit()
+
+def truncate_full_db():
+    cursor.execute('''
+                EXEC sp_MSforeachtable 'TRUNCATE TABLE ?' 
+                ''')
+    cursor.commit()
+    # quit()
 
 def Update_visaBulletin(month=''):
     #try:
@@ -309,6 +317,7 @@ def update_log(client_name, status, file1, file2, e ):
 
 def start():
     truncate_all()
+    # quit()
     current_time = datetime.now() 
     month = str(current_time.month).rjust(2, '0')
     day = str(current_time.day).rjust(2, '0')
@@ -328,7 +337,7 @@ def start():
                 process_beneficiary_file('Source Data/'+benificiary_file_name,from_name)
 
     
-    for name in glob.glob('Source Data/*Case*'):
+    for name in glob.glob('Source Data/*Case Data*'):
         ##print(os.path.basename(name))
         filename_e = os.path.basename(name)
         filename = os.path.splitext(filename_e)[0]
@@ -347,12 +356,39 @@ def start():
                 print('Processing - '+case_file_name)
                 process_case_file('Source Data/'+case_file_name, from_name, Beneficiary_exists)
 
+    #generates the cases and ben files and wipes the db and then starts the same operation for the last open cases file
+    generate_report()
+    truncate_all()
+
+    for name in glob.glob('Source Data/*Open Cases*'):
+        ##print(os.path.basename(name))
+        filename_e = os.path.basename(name)
+        filename = os.path.splitext(filename_e)[0]
+        extension = os.path.splitext(filename_e)[1]
+        ##print(extension)
+        if extension == '.csv' and  todate in filename:
+            from_name = (filename.split('Cases_'))[1].split('_'+str(todate))[0].strip()
+            open_case_file_name = 'Reports Automation_Open Cases_'+str(from_name)+'_'+todate+'.csv'
+
+            benificiary_file_name = 'Reports Automation_Beneficiary Data_'+str(from_name)+'_'+todate+'.csv'
+            if not os.path.exists('Source Data/'+benificiary_file_name):
+                Beneficiary_exists = False
+            else:
+                Beneficiary_exists = True
+            if os.path.exists('Source Data/'+open_case_file_name)  and filename_e == open_case_file_name:
+                print('Processing - '+open_case_file_name)
+
+                process_open_case_file('Source Data/'+open_case_file_name, from_name, Beneficiary_exists)
+               
+        generate_open_case_report(todate)
+        generate_report('for open_cases')
+
     #if from_name:
     #    print('Generating Report - '+from_name)
     #    generate_case_report()
         
         
-    
+  
         
 def process_beneficiary_file(file_path, from_name):
     with open(file_path,'rb') as f:
@@ -1206,6 +1242,11 @@ def process_case_file(file_path, from_name, Beneficiary_exists):
                     if DB_ENCRYPTION == "YES":
                         case_reviewing_attorney = (fernet.encrypt(case_reviewing_attorney.encode())).decode("utf-8")
                 
+                elif "Reviewing Attorney(Case)" in list_h and not pd.isna(row["Reviewing Attorney(Case)"]):
+                    case_reviewing_attorney = str(str(row["Reviewing Attorney(Case)"]).strip()).replace("'", "")
+                    if DB_ENCRYPTION == "YES":
+                        case_reviewing_attorney = (fernet.encrypt(case_reviewing_attorney.encode())).decode("utf-8")
+
                 case_primary_case_manager = ''
                 if "Case Primary Case Manager" in list_h and not pd.isna(row["Case Primary Case Manager"]):
                     case_primary_case_manager = str(str(row["Case Primary Case Manager"]).strip()).replace("'", "")
@@ -1233,10 +1274,394 @@ def process_case_file(file_path, from_name, Beneficiary_exists):
                         cursor.execute("UPDATE [dbo].[Case] SET CaseXref='{}', BeneficiaryId='{}', SourceCreatedDate='{}', CasePetitionName='{}', CaseType='{}', CaseDescription='{}', CaseFiledDate='{}', ReceiptNumber='{}', ReceiptStatus='{}', RFEAuditReceivedDate='{}', RFEAuditDueDate='{}', RFEAuditSubmittedDate='{}', PrimaryCaseStatus='{}', SecondaryCaseStatus='{}', CaseComments='{}', LastStepCompleted='{}', LastStepCompletedDate='{}', NextStepAction='{}', NextStepActionDueDate='{}', PriorityDate='{}', PriorityCategory='{}', PriorityCountry='{}', CaseApprovedDate='{}', CaseValidFromDate='{}', CaseExpirationDate='{}', CaseClosedDate='{}', CaseDeniedDate='{}', CaseWithdrawnDate='{}', CasePrimaryAttorney='{}', CaseReviewingAttorney='{}', CasePrimaryCaseManager='{}', PetitionXref='{}', from_name='{}' WHERE CaseId='{}'".format(case_xref, beneficiary_id, case_creation_date, case_petition_name, case_type, case_description, case_filed_date, case_receipt_number, case_receipt_status, rfe_audit_received_date, rfe_audit_due_date, rfe_audit_submitted_date, primary_case_status, secondary_case_status, case_comments, case_last_step_completed, case_last_step_completed_date, case_next_step_to_be_completed, case_next_step_to_be_completed_date, case_priority_date, case_priority_category, case_priority_country, case_approved_date, case_valid_from, case_valid_to, case_closed_date, case_denied_date, case_withdrawn_date, case_primary_attorney, case_reviewing_attorney, case_primary_case_manager, petition_xref, from_name, case_id))
                         cursor.commit()
 
+def process_open_case_file(file_path, from_name, Beneficiary_exists):
+    with open(file_path,'rb') as f:
+        rawdata = b''.join([f.readline() for _ in range(20)])
+    enc= chardet.detect(rawdata)['encoding'] #UTF-16
+
+    df = pd.read_csv(file_path, encoding=enc,delimiter='\t')
+    list_h = df.columns.tolist()
+    total_rows = len(df)
+
+    if Beneficiary_exists==False:
+        from_source = 'case' 
+    else:
+        from_source = 'beneficiary' 
+    for index, row in df.iterrows():
+        organization_xref = ''
+        if 'Organization Xref' in list_h:
+            organization_xref = str(row['Organization Xref']).strip()
+        
+        organization_name = ''
+        if "Organization Name" in list_h:
+            organization_name = str(str(row['Organization Name']).replace("'", "")).strip()
+            if DB_ENCRYPTION == "YES":
+                    organization_name = (fernet.encrypt(organization_name.encode())).decode("utf-8")
+
+        organization_id = ''
+        if organization_xref  and organization_name :
+            ##print("SELECT * FROM dbo.Organization where OrganizationXref='{}' and OrganizationName = '{}'".format(organization_xref, organization_name))
+            results = cursor.execute("SELECT * FROM dbo.Organization where OrganizationXref='{}'".format(organization_xref)).fetchall()
+            length = len(results)
+            if length <= 0:
+                ##print("INSERT INTO dbo.Organization(OrganizationXref, OrganizationName) VALUES ('{}', '{}')".format(organization_xref, organization_name))
+                cursor.execute("INSERT INTO dbo.Organization(OrganizationXref, OrganizationName) VALUES ('{}', '{}')".format(organization_xref, organization_name))
+                cursor.execute("SELECT @@IDENTITY AS ID;")
+                organization_id = cursor.fetchone()[0]
+                cursor.commit()
+                ##print('inserted')
+            else:
+                organization_id = results[0].OrganizationId
+        
+        ##print('oid ', organization_id)
+        petitioner_xref = ''
+        if "Petitioner Xref" in list_h:
+            petitioner_xref = str(row['Petitioner Xref']).strip()
+        
+        petitioner_name = ''
+        if "Petitioner Name" in list_h:
+            petitioner_name = str(str(row['Petitioner Name']).replace("'", "")).strip()
+            
+
+        petitioner_id = ''
+        is_primary_beneficiary = 1
+        if petitioner_xref and petitioner_name:
+            if petitioner_name == 'Individual Client' :
+                if str(row['Primary Beneficiary Xref']).strip():
+                    ##print("SELECT PetitionerId FROM dbo.Beneficiary where BeneficiaryXref='{}'".format(row['Primary Beneficiary Xref'].strip()))
+                    results = cursor.execute("SELECT PetitionerId FROM dbo.Beneficiary where BeneficiaryXref='{}'".format(str(row['Primary Beneficiary Xref']).strip())).fetchall()
+                    length = len(results)
+                    if length > 0:
+                        petitioner_id = results[0][0]
+                        is_primary_beneficiary = 0
+                   
+                    
+
+            else:
+                ##print("SELECT * FROM dbo.Petitioner where PetitionerXref='{}' and PetitionerName = '{}' and OrganizationId={}".format(petitioner_xref, petitioner_name, organization_id))
+                results = cursor.execute("SELECT * FROM dbo.Petitioner where PetitionerXref='{}' and OrganizationId={}".format(petitioner_xref,  organization_id)).fetchall()
+                length = len(results)
+                if length <= 0:
+                    ##print("INSERT INTO dbo.Petitioner(PetitionerXref, PetitionerName, OrganizationId) VALUES ('{}', '{}', '{}')".format(petitioner_xref, petitioner_name, organization_id))
+                    cursor.execute("INSERT INTO dbo.Petitioner(PetitionerXref, PetitionerName, OrganizationId) VALUES ('{}', '{}', '{}')".format(petitioner_xref, petitioner_name, organization_id))
+                    cursor.execute("SELECT @@IDENTITY AS ID;")
+                    petitioner_id = cursor.fetchone()[0]
+                    cursor.commit()
+                else:
+                    petitioner_id = results[0].PetitionerId
+        
+        ##print('pid ', petitioner_id)
+        #if petitioner_id :
+        if True:
+            beneficiary_xref = ''
+            if "Beneficiary Xref" in list_h and not pd.isna(row["Beneficiary Xref"]):
+                beneficiary_xref = str(row["Beneficiary Xref"]).strip()
+            
+            beneficiary_type = ''
+            if "Beneficiary Type" in list_h and not pd.isna(row["Beneficiary Type"]):
+                beneficiary_type = str(row["Beneficiary Type"]).strip()
+            
+            beneficiary_record_creation_date = ''
+            if "Beneficiary Record Creation Date" in list_h and row["Beneficiary Record Creation Date"] and not pd.isna(row["Beneficiary Record Creation Date"]):
+                beneficiary_record_creation_date = change_format(row["Beneficiary Record Creation Date"])
+            
+            beneficiary_record_inactivation_date = ''
+            if "Beneficiary Record Inactivation Date" in list_h and row["Beneficiary Record Inactivation Date"] and not pd.isna(row["Beneficiary Record Inactivation Date"]):
+                beneficiary_record_inactivation_date = change_format(row["Beneficiary Record Inactivation Date"])
+
+            beneficiary_record_status = 0
+            if "Beneficiary Record Status" in list_h and not pd.isna(row["Beneficiary Record Status"]):
+                beneficiary_record_status = str(row["Beneficiary Record Status"]).strip()
+                if beneficiary_record_status == 'Active':
+                    beneficiary_record_status = 1
+                else:
+                    beneficiary_record_status = 0
+
+            beneficiary_last_name = ''
+            if "Beneficiary Last Name" in list_h and not pd.isna(row["Beneficiary Last Name"]):
+                beneficiary_last_name = str(str(row["Beneficiary Last Name"]).strip()).replace("'", "")
+
+            beneficiary_first_name = ''
+            if "Beneficiary First Name" in list_h  and not pd.isna(row["Beneficiary First Name"]):
+                beneficiary_first_name = str(str(row["Beneficiary First Name"]).strip()).replace("'", "")
+                if DB_ENCRYPTION == "YES":
+                    beneficiary_first_name = (fernet.encrypt(beneficiary_first_name.encode())).decode("utf-8")
+
+            beneficiary_middle_name = ''
+            if "Beneficiary Middle Name" in list_h and not pd.isna(row["Beneficiary Middle Name"]):
+                beneficiary_middle_name = str(str(row["Beneficiary Middle Name"]).strip()).replace("'", "")
+                if DB_ENCRYPTION == "YES":
+                    beneficiary_middle_name = (fernet.encrypt(beneficiary_middle_name.encode())).decode("utf-8")
+
+            primary_beneficiary_id = ''
+            if "Primary Beneficiary Xref" in list_h and not pd.isna(row["Primary Beneficiary Xref"]):
+                primary_beneficiary_id = str(row["Primary Beneficiary Xref"]).strip()
+
+            if primary_beneficiary_id == beneficiary_xref:
+                is_primary_beneficiary = 1
+            else:
+                is_primary_beneficiary = 0
+
+            primary_beneficiary_last_name = ''
+            if "Primary Beneficiary Last Name" in list_h and not pd.isna(row["Primary Beneficiary Last Name"]):
+                primary_beneficiary_last_name = (row["Primary Beneficiary Last Name"].strip()).replace("'", "")
+                if DB_ENCRYPTION == "YES":
+                    primary_beneficiary_last_name = (fernet.encrypt(primary_beneficiary_last_name.encode())).decode("utf-8")
+            
+            primary_beneficiary_first_name = ''
+            if "Primary Beneficiary First Name" in list_h and not pd.isna(row["Primary Beneficiary First Name"]):
+                primary_beneficiary_first_name = (row["Primary Beneficiary First Name"].strip()).replace("'", "")
+                if DB_ENCRYPTION == "YES":
+                    primary_beneficiary_first_name = (fernet.encrypt(primary_beneficiary_first_name.encode())).decode("utf-8")
+            
+            relation = ''
+            if "Relation" in list_h and not pd.isna(row["Relation"]):
+                relation = row["Relation"].strip()
+                if DB_ENCRYPTION == "YES":
+                    relation = (fernet.encrypt(relation.encode())).decode("utf-8")
+
+            immigration_status = ''
+            if "Immigration Status" in list_h and not pd.isna(row["Immigration Status"]):
+                immigration_status = str(row["Immigration Status"]).strip()
+
+            immigration_status_expiration_status = ''
+            if "Immigration Status Expiration Date" in list_h and row["Immigration Status Expiration Date"] and not pd.isna(row["Immigration Status Expiration Date"]):
+                if row["Immigration Status Expiration Date"].strip() == 'D/S':
+                    immigration_status_expiration_status = 'D/S'
+                else:
+                    if 'D/S' in row["Immigration Status Expiration Date"]:
+                        split1 = str(str(row["Immigration Status Expiration Date"]).strip()).split('(D/S)')
+                        immigration_status_expiration_status = change_format(split1[0])
+                        immigration_status_expiration_status = str(immigration_status_expiration_status)+' (D/S)'
+                    else:
+                        immigration_status_expiration_status = change_format(row["Immigration Status Expiration Date"])
+
+            i797_approved_date = ''
+            if "I-797 Approved Date" in list_h and row["I-797 Approved Date"] and not pd.isna(row["I-797 Approved Date"]):
+                i797_approved_date = change_format(row["I-797 Approved Date"])
+
+            i797_status = ''
+            if "I-797 Status" in list_h and not pd.isna(row["I-797 Status"]):
+                i797_status = str(row["I-797 Status"]).strip()
+                if DB_ENCRYPTION == "YES":
+                    i797_status = (fernet.encrypt(i797_status.encode())).decode("utf-8")
+            
+            i797_expiration_date = ''
+            if "I-797 Expiration Date" in list_h and row["I-797 Expiration Date"] and not pd.isna(row["I-797 Expiration Date"]):
+                i797_expiration_date = change_format(row["I-797 Expiration Date"])
+
+            final_niv_maxout_date = ''
+            if "Final NIV (Maxout) Date" in list_h and row["Final NIV (Maxout) Date"] and not pd.isna(row["Final NIV (Maxout) Date"]):
+                final_niv_maxout_date = change_format(row["Final NIV (Maxout) Date"])
+
+            maxout_note = ''
+            if "Maxout Date Applicability and Note" in list_h and not pd.isna(row["Maxout Date Applicability and Note"]):
+                maxout_note = str(row["Maxout Date Applicability and Note"]).strip()
+                if DB_ENCRYPTION == "YES":
+                    maxout_note = (fernet.encrypt(maxout_note.encode())).decode("utf-8")
+
+            PetitionerofPrimaryBeneficiary = ''
+            if "Petitioner of Primary Beneficiary" in list_h:
+                PetitionerofPrimaryBeneficiary = str(str(row['Petitioner of Primary Beneficiary']).replace("'", "")).strip()
+
+            beneficiary_id = ''
+            if beneficiary_xref:
+                results = cursor.execute("SELECT * FROM dbo.Beneficiary where BeneficiaryXref='{}' and from_name='{}'".format(beneficiary_xref, from_name)).fetchall()
+                length = len(results)
+                if length <= 0:
+                    
+                    cursor.execute("INSERT INTO dbo.Beneficiary(PetitionerofPrimaryBeneficiary,PetitionerId, BeneficiaryXref, BeneficiaryType, SourceCreatedDate, IsActive, InactiveDate, LastName, FirstName, MiddleName, PrimaryBeneficiaryXref, PrimaryBeneficiaryLastName, PrimaryBeneficiaryFirstName, RelationType, ImmigrationStatus, ImmigrationStatusExpirationDate, MostRecentI797IssueApprovalDate, MostRecentI797Status, I797ExpirationDate, FinalNivDate, MaxOutDateNote, from_name, is_primary_beneficiary, from_source  ) VALUES ('{}','{}', '{}', '{}', '{}', '{}', '{}', '{}', '{}', '{}', '{}','{}', '{}', '{}', '{}', '{}', '{}', '{}', '{}', '{}', '{}', '{}', '{}', '{}')".format(PetitionerofPrimaryBeneficiary,petitioner_id, beneficiary_xref, beneficiary_type, beneficiary_record_creation_date, beneficiary_record_status, beneficiary_record_inactivation_date, beneficiary_last_name, beneficiary_first_name, beneficiary_middle_name, primary_beneficiary_id, primary_beneficiary_last_name, primary_beneficiary_first_name, relation, immigration_status, immigration_status_expiration_status, i797_approved_date, i797_status, i797_expiration_date, final_niv_maxout_date, maxout_note, from_name, is_primary_beneficiary, from_source))
+                    cursor.execute("SELECT @@IDENTITY AS ID;")
+                    beneficiary_id = cursor.fetchone()[0]
+                    cursor.commit()
+                else:
+                    beneficiary_id = results[0].BeneficiaryId
+                    cursor.execute("UPDATE  dbo.Beneficiary SET PetitionerofPrimaryBeneficiary='{}', PetitionerId='{}', BeneficiaryXref='{}', BeneficiaryType='{}', SourceCreatedDate='{}', IsActive='{}', InactiveDate='{}', LastName='{}', FirstName='{}', MiddleName='{}', PrimaryBeneficiaryXref='{}', PrimaryBeneficiaryLastName='{}', PrimaryBeneficiaryFirstName='{}', RelationType='{}', ImmigrationStatus='{}', ImmigrationStatusExpirationDate='{}', MostRecentI797IssueApprovalDate='{}', MostRecentI797Status='{}', I797ExpirationDate='{}', FinalNivDate='{}', MaxOutDateNote='{}', from_name='{}', is_primary_beneficiary='{}' WHERE BeneficiaryId='{}'  ".format(PetitionerofPrimaryBeneficiary,petitioner_id, beneficiary_xref, beneficiary_type, beneficiary_record_creation_date, beneficiary_record_status, beneficiary_record_inactivation_date, beneficiary_last_name, beneficiary_first_name, beneficiary_middle_name, primary_beneficiary_id, primary_beneficiary_last_name, primary_beneficiary_first_name, relation, immigration_status, immigration_status_expiration_status, i797_approved_date, i797_status, i797_expiration_date, final_niv_maxout_date, maxout_note, from_name, is_primary_beneficiary, beneficiary_id))
+                    cursor.commit()
+
+            ##print('bid ',beneficiary_id)
+            if beneficiary_id:
+                case_xref = ''
+                if "Case Xref" in list_h and not pd.isna(row["Case Xref"]):
+                    case_xref = str(row["Case Xref"]).strip()
+                
+                case_creation_date = ''
+                if "Case Created Date" in list_h and row["Case Created Date"] and not pd.isna(row["Case Created Date"]):
+                    case_creation_date = change_format(row["Case Created Date"])
+
+                case_petition_name = ''
+                if "Case Petition Name" in list_h and not pd.isna(row["Case Petition Name"]):
+                    case_petition_name = str(str(row["Case Petition Name"]).strip()).replace("'", "")
+                    if DB_ENCRYPTION == "YES":
+                        case_petition_name = (fernet.encrypt(case_petition_name.encode())).decode("utf-8")
+
+                case_type = ''
+                if "Case Type" in list_h and not pd.isna(row["Case Type"]):
+                    case_type = str(str(row["Case Type"]).strip()).replace("'", "")
+                    if DB_ENCRYPTION == "YES":
+                        case_type = (fernet.encrypt(case_type.encode())).decode("utf-8")
+
+                case_description = ''
+                if "Case Description" in list_h and not pd.isna(row["Case Description"]):
+                    case_description = str(str(row["Case Description"]).strip()).replace("'", "")
+                    if DB_ENCRYPTION == "YES":
+                        case_description = (fernet.encrypt(case_description.encode())).decode("utf-8")
+                
+                case_filed_date = ''
+                if "Case Filed Date" in list_h and row["Case Filed Date"] and not pd.isna(row["Case Filed Date"]):
+                    case_filed_date = change_format(row["Case Filed Date"])
+                
+                
+                case_receipt_number = ''
+                if "Case Receipt Number" in list_h and not pd.isna(row["Case Receipt Number"]):
+                    case_receipt_number = str(row["Case Receipt Number"]).strip()
+                    if DB_ENCRYPTION == "YES":
+                        case_receipt_number = (fernet.encrypt(case_receipt_number.encode())).decode("utf-8")
+
+                case_receipt_status = ''
+                if "Case Receipt Status" in list_h and not pd.isna(row["Case Receipt Status"]):
+                    case_receipt_status = str(row["Case Receipt Status"]).strip()
+                    if DB_ENCRYPTION == "YES":
+                        case_receipt_status = (fernet.encrypt(case_receipt_status.encode())).decode("utf-8")
+
+                rfe_audit_received_date = ''
+                if "RFE/Audit Received Date" in list_h and row["RFE/Audit Received Date"] and not pd.isna(row["RFE/Audit Received Date"]):
+                    rfe_audit_received_date = change_format(row["RFE/Audit Received Date"])
+                
+                rfe_audit_due_date = ''
+                if "RFE/Audit Response Due Date" in list_h and row["RFE/Audit Response Due Date"] and not pd.isna(row["RFE/Audit Response Due Date"]):
+                    rfe_audit_due_date = change_format(row["RFE/Audit Response Due Date"])
+                
+                rfe_audit_submitted_date = ''
+                if "RFE/Audit Response Submitted Date" in list_h and row["RFE/Audit Response Submitted Date"] and not pd.isna(row["RFE/Audit Response Submitted Date"]):
+                    rfe_audit_submitted_date = change_format(row["RFE/Audit Response Submitted Date"])
+
+                primary_case_status = ''
+                if "Primary Case Status" in list_h and not pd.isna(row["Primary Case Status"]):
+                    primary_case_status = str(row["Primary Case Status"]).strip()
+
+                secondary_case_status = ''
+                if "Secondary Case Status" in list_h and not pd.isna(row["Secondary Case Status"]):
+                    secondary_case_status = str(str(row["Secondary Case Status"]).strip()).replace("'", "")
+                
+                case_comments = ''
+                if "Case Comments" in list_h and not pd.isna(row["Case Comments"]):
+                    case_comments = str(str(row["Case Comments"]).strip()).replace("'", "")
+                    if DB_ENCRYPTION == "YES":
+                        case_comments = (fernet.encrypt(case_comments.encode())).decode("utf-8")
+
+                case_last_step_completed = ''
+                if "Case Last Step Completed" in list_h and not pd.isna(row["Case Last Step Completed"]):
+                    case_last_step_completed = str(str(row["Case Last Step Completed"]).strip()).replace("'", "")
+                    case_last_step_completed = case_last_step_completed.replace("'", "`")
+                    if DB_ENCRYPTION == "YES":
+                        case_last_step_completed = (fernet.encrypt(case_last_step_completed.encode())).decode("utf-8")
+
+                case_last_step_completed_date = ''
+                if "Case Last Step Completed Date" in list_h and row["Case Last Step Completed Date"] and not pd.isna(row["Case Last Step Completed Date"]):
+                    case_last_step_completed_date = change_format(row["Case Last Step Completed Date"])
+
+                case_next_step_to_be_completed = ''
+                if "Case Next Step To Be Completed" in list_h and not pd.isna(row["Case Next Step To Be Completed"]):
+                    case_next_step_to_be_completed = str(str(row["Case Next Step To Be Completed"]).strip()).replace("'", "")
+                    if DB_ENCRYPTION == "YES":
+                        case_next_step_to_be_completed = (fernet.encrypt(case_next_step_to_be_completed.encode())).decode("utf-8")
+                
+                case_next_step_to_be_completed_date = ''
+                if "Case Next Step To Be Completed Date" in list_h and row["Case Next Step To Be Completed Date"] and not pd.isna(row["Case Next Step To Be Completed Date"]):
+                    case_next_step_to_be_completed_date = change_format(row["Case Next Step To Be Completed Date"])
+                
+                case_priority_date = ''
+                if "Case Priority Date" in list_h and row["Case Priority Date"] and not pd.isna(row["Case Priority Date"]):
+                    case_priority_date = change_format(row["Case Priority Date"])
+
+                case_priority_category = ''
+                if "Case Priority Category" in list_h and not pd.isna(row["Case Priority Category"]):
+                    case_priority_category = str(row["Case Priority Category"]).strip()
+                    if DB_ENCRYPTION == "YES":
+                        case_priority_category = (fernet.encrypt(case_priority_category.encode())).decode("utf-8")
+
+                case_priority_country = ''
+                if "Case Priority Country" in list_h and not pd.isna(row["Case Priority Country"]):
+                    case_priority_country = str(row["Case Priority Country"]).strip()
+                    if DB_ENCRYPTION == "YES":
+                        case_priority_country = (fernet.encrypt(case_priority_country.encode())).decode("utf-8")
+
+                case_approved_date = '' 
+                if "Case Approved Date" in list_h and row["Case Approved Date"] and not pd.isna(row["Case Approved Date"]):
+                    case_approved_date = change_format(row["Case Approved Date"])
+                
+                case_valid_from = ''
+                if "Case Valid From" in list_h and row["Case Valid From"] and not pd.isna(row["Case Valid From"]):
+                    case_valid_from = change_format(row["Case Valid From"])
+                
+                case_valid_to = ''
+                if "Case Valid To" in list_h and row["Case Valid To"] and not pd.isna(row["Case Valid To"]):
+                    case_valid_to = change_format(row["Case Valid To"])
+                
+                case_closed_date = ''
+                if "Case Closed Date" in list_h and row["Case Closed Date"] and not pd.isna(row["Case Closed Date"]):
+                    case_closed_date = change_format(row["Case Closed Date"])
+                
+                case_denied_date = ''
+                if "Case Denied Date" in list_h and row["Case Denied Date"] and not pd.isna(row["Case Denied Date"]):
+                    case_denied_date = change_format(row["Case Denied Date"])
+                
+                case_withdrawn_date = ''
+                if "Case Withdrawn Date" in list_h and row["Case Withdrawn Date"] and not pd.isna(row["Case Withdrawn Date"]):
+                    case_withdrawn_date = change_format(row["Case Withdrawn Date"])
+                
+                case_primary_attorney = ''
+                if "Case Primary Attorney" in list_h and not pd.isna(row["Case Primary Attorney"]):
+                    case_primary_attorney = str(str(row["Case Primary Attorney"]).strip()).replace("'", "")
+                    if DB_ENCRYPTION == "YES":
+                        case_primary_attorney = (fernet.encrypt(case_primary_attorney.encode())).decode("utf-8")
+                
+                case_reviewing_attorney = ''
+                if "Case Reviewing Attorney" in list_h and not pd.isna(row["Case Reviewing Attorney"]):
+                    case_reviewing_attorney = str(str(row["Case Reviewing Attorney"]).strip()).replace("'", "")
+                    if DB_ENCRYPTION == "YES":
+                        case_reviewing_attorney = (fernet.encrypt(case_reviewing_attorney.encode())).decode("utf-8")
+                
+                elif "Reviewing Attorney(Case)" in list_h and not pd.isna(row["Reviewing Attorney(Case)"]):
+                    case_reviewing_attorney = str(str(row["Reviewing Attorney(Case)"]).strip()).replace("'", "")
+                    if DB_ENCRYPTION == "YES":
+                        case_reviewing_attorney = (fernet.encrypt(case_reviewing_attorney.encode())).decode("utf-8")
+                
+                case_primary_case_manager = ''
+                if "Case Primary Case Manager" in list_h and not pd.isna(row["Case Primary Case Manager"]):
+                    case_primary_case_manager = str(str(row["Case Primary Case Manager"]).strip()).replace("'", "")
+                    if DB_ENCRYPTION == "YES":
+                        case_primary_case_manager = (fernet.encrypt(case_primary_case_manager.encode())).decode("utf-8")
+                
+                petition_xref = ''
+                if "Petition Xref" in list_h and not pd.isna(row["Petition Xref"]):
+                    petition_xref = str(row["Petition Xref"]).strip()
+                
+                case_id = ''
+                ##print('cx ', case_xref)
+                if case_xref:
+                    
+                    ##print("SELECT * FROM [dbo].[Case] where BeneficiaryId='{}' and CaseXref='{}' and from_name='{}'".format(beneficiary_id, case_xref, from_name))
+                    results = cursor.execute("SELECT * FROM [dbo].[Case] where BeneficiaryId='{}' and CaseXref='{}' and from_name='{}'".format(beneficiary_id, case_xref, from_name)).fetchall()
+                    length = len(results)
+                    if length <= 0:
+                        cursor.execute("INSERT INTO [dbo].[Case](CaseXref, BeneficiaryId, SourceCreatedDate, CasePetitionName, CaseType, CaseDescription, CaseFiledDate, ReceiptNumber, ReceiptStatus, RFEAuditReceivedDate,RFEAuditDueDate, RFEAuditSubmittedDate, PrimaryCaseStatus, SecondaryCaseStatus, CaseComments, LastStepCompleted, LastStepCompletedDate, NextStepAction, NextStepActionDueDate, PriorityDate, PriorityCategory, PriorityCountry, CaseApprovedDate, CaseValidFromDate, CaseExpirationDate, CaseClosedDate, CaseDeniedDate, CaseWithdrawnDate, CasePrimaryAttorney, CaseReviewingAttorney, CasePrimaryCaseManager, PetitionXref, from_name) VALUES ('{}', '{}', '{}', '{}', '{}', '{}', '{}', '{}', '{}', '{}','{}', '{}', '{}', '{}', '{}', '{}', '{}', '{}', '{}', '{}', '{}', '{}', '{}', '{}', '{}', '{}', '{}', '{}', '{}', '{}', '{}', '{}', '{}')".format(case_xref, beneficiary_id, case_creation_date, case_petition_name, case_type, case_description, case_filed_date, case_receipt_number, case_receipt_status, rfe_audit_received_date, rfe_audit_due_date, rfe_audit_submitted_date, primary_case_status, secondary_case_status, case_comments, case_last_step_completed, case_last_step_completed_date, case_next_step_to_be_completed, case_next_step_to_be_completed_date, case_priority_date, case_priority_category, case_priority_country, case_approved_date, case_valid_from, case_valid_to, case_closed_date, case_denied_date, case_withdrawn_date, case_primary_attorney, case_reviewing_attorney, case_primary_case_manager, petition_xref, from_name))
+                        cursor.execute("SELECT @@IDENTITY AS ID;")
+                        case_id = cursor.fetchone()[0]
+                        cursor.commit()
+                    else:
+                        case_id = results[0].CaseId
+                        cursor.execute("UPDATE [dbo].[Case] SET CaseXref='{}', BeneficiaryId='{}', SourceCreatedDate='{}', CasePetitionName='{}', CaseType='{}', CaseDescription='{}', CaseFiledDate='{}', ReceiptNumber='{}', ReceiptStatus='{}', RFEAuditReceivedDate='{}', RFEAuditDueDate='{}', RFEAuditSubmittedDate='{}', PrimaryCaseStatus='{}', SecondaryCaseStatus='{}', CaseComments='{}', LastStepCompleted='{}', LastStepCompletedDate='{}', NextStepAction='{}', NextStepActionDueDate='{}', PriorityDate='{}', PriorityCategory='{}', PriorityCountry='{}', CaseApprovedDate='{}', CaseValidFromDate='{}', CaseExpirationDate='{}', CaseClosedDate='{}', CaseDeniedDate='{}', CaseWithdrawnDate='{}', CasePrimaryAttorney='{}', CaseReviewingAttorney='{}', CasePrimaryCaseManager='{}', PetitionXref='{}', from_name='{}' WHERE CaseId='{}'".format(case_xref, beneficiary_id, case_creation_date, case_petition_name, case_type, case_description, case_filed_date, case_receipt_number, case_receipt_status, rfe_audit_received_date, rfe_audit_due_date, rfe_audit_submitted_date, primary_case_status, secondary_case_status, case_comments, case_last_step_completed, case_last_step_completed_date, case_next_step_to_be_completed, case_next_step_to_be_completed_date, case_priority_date, case_priority_category, case_priority_country, case_approved_date, case_valid_from, case_valid_to, case_closed_date, case_denied_date, case_withdrawn_date, case_primary_attorney, case_reviewing_attorney, case_primary_case_manager, petition_xref, from_name, case_id))
+                        cursor.commit()
+ 
+
+
+                    # cursor.execute("INSERT INTO [dbo].[opencase](BeneficiaryXref, BeneficiaryType, SourceCreatedDate, IsActive, InactiveDate, LastName, FirstName, MiddleName, PrimaryBeneficiaryXref, PrimaryBeneficiaryLastName, PrimaryBeneficiaryFirstName, RelationType, ImmigrationStatus, ImmigrationStatusExpirationDate, MostRecentI797IssueApprovalDate, MostRecentI797Status, I797ExpirationDate, FinalNivDate, MaxOutDateNote, from_name, is_primary_beneficiary, from_source  ) VALUES ('{}', '{}', '{}', '{}', '{}', '{}', '{}', '{}', '{}', '{}','{}', '{}', '{}', '{}', '{}', '{}', '{}', '{}', '{}', '{}', '{}', '{}')".format(beneficiary_xref, beneficiary_type, beneficiary_record_creation_date, beneficiary_record_status, beneficiary_record_inactivation_date, beneficiary_last_name, beneficiary_first_name, beneficiary_middle_name, primary_beneficiary_id, primary_beneficiary_last_name, primary_beneficiary_first_name, relation, immigration_status, immigration_status_expiration_status, i797_approved_date, i797_status, i797_expiration_date, final_niv_maxout_date, maxout_note, from_name, is_primary_beneficiary, from_source))
 
 
                 
-def generate_report():
+def generate_report(for_open_cases = None):
     
     fernet_key = b'zJD8OVkFNpd5N4fJw6pqaWiDrvybkselSQ0fF9SwXfw='
     fernet = Fernet(fernet_key)
@@ -1347,20 +1772,38 @@ def generate_report():
                             case_data_confirm = True
                 
                 if beneficiary_id is not None and case_data_confirm == True:
-                    print(client_short_name)
+
                     result_filepath = str(client_short_name)+'_'+str(report_name)+'_'+str(todate)+'.xlsx'
                     result_filepath_folder = 'Processed Reports/'+str(client_short_name)+'_'+str(report_name)+'_'+str(todate)+'.xlsx'
-                    process_report(result_filepath_folder, o_xref, p_xref, str(client_short_name), case_data_confirm)
-                    print('Case Report Generated for '+str(client_short_name))
-
+                    
                     result_filepath_folder2 = 'Processed Reports/'+str(client_short_name)+'_Document Expiration Report_'+str(todate)+'.xlsx'
                     result_filepath2 = str(client_short_name)+'_Document Expiration Report_'+str(todate)+'.xlsx'
-                    send_exp_report = generate_expiration_report(todate, data_o, o_xref, p_xref, result_filepath_folder2)
-                    if SEND_MAIL == "YES":
-                        print('Sending Mail to client '+str(client_short_name))
-                        send_email(result_filepath, data_o, result_filepath2, send_exp_report, client_short_name)
+
+                    if for_open_cases==None:
+                        print(client_short_name)
+                        
+                        #the below code creates the excel in the o/p folder
+                        process_report(result_filepath_folder, o_xref, p_xref, str(client_short_name), case_data_confirm)
+                        print('Case Report Generated for '+str(client_short_name))
+                        
+                        send_exp_report = generate_expiration_report(todate, data_o, o_xref, p_xref, result_filepath_folder2)
+
                     else:
-                        update_log(client_short_name, 'Send Mail Disabled', result_filepath, result_filepath2, '' )
+                        # for opencases report:
+                        result_filepath3 = 'Open Cases_Julia Holod_'+str(todate)+'.xlsx'           
+
+                    if SEND_MAIL == "YES":
+                        if for_open_cases:
+                            print('Sending Opencase report Mail to client '+str(client_short_name))
+                            
+                            send_email(result_filepath3, data_o,client_short_name)
+                        else:
+                            print('Sending Mail to client '+str(client_short_name))
+                            
+                            send_email(result_filepath, data_o, client_short_name, result_filepath2, send_exp_report)
+                    else:            
+                        update_log(client_short_name, 'Send Mail Disabled', result_filepath, result_filepath2, '')                
+
                     print('')
 
 def generate_expiration_report(todate='', results_client='', o_xref='', p_xref='', result_filepath=''):
@@ -1680,6 +2123,161 @@ def process_expiration_report(result_filepath, o_xref, p_xref, client_short_name
 
     wb_pyxl.active = 0 #active First sheet
     wb_pyxl.save(result_filepath)
+
+def generate_open_case_report(todate):
+    
+    df = pd.DataFrame()
+
+    open_case_path = 'Processed Reports/Open Cases_Julia Holod_'+todate+'.xlsx' 
+
+    writer = pd.ExcelWriter(open_case_path, engine='xlsxwriter', date_format='m/d/yyyy')
+
+    
+
+    #Tab 1
+    # if 5<2:
+    # # if (client_short_name.strip()).casefold() == "Alcon".casefold() or (client_short_name.strip()).casefold() == "Fractal".casefold():
+    #     #headers2 = ['Beneficiary Id', 'Organization Name', 'Petitioner Name', 'Petitioner of Primary Beneficiary', 'Beneficiary Type (Employee / Dependent)', 'Beneficiary Record Creation Date', 'Beneficiary Record Status', 'Beneficiary Record Inactivation Date', 'Beneficiary Employee Id', 'Beneficiary Last Name', 'Beneficiary First Name', 'Beneficiary Middle Name', 'Primary Beneficiary Id', 'Primary Beneficiary Last Name', 'Primary Beneficiary First Name', 'Relation', 'Immigration Status (I-94)', 'Immigration Status Expiration Date (I-94)', 'I-797 Approved Date', 'I-797 Status', 'I-797 Expiration Date', 'Final NIV (Maxout) Date', 'Maxout Date Applicability and Note', 'Case Id', 'Case Created Date', 'Case Petition Name', 'Case Description', 'Case Filed Date', 'Case Receipt Number', 'Case Receipt Status', 'RFE/Audit Received Date', 'RFE/Audit Response Due Date', 'RFE/Audit Response Submitted Date', 'Primary Case Status', 'Secondary Case Status', 'Case Comments', 'Case Last Step Completed', 'Case Last Step Completed Date', 'Case Next Step To Be Completed', 'Case Next Step To Be Completed Date', 'Case Priority Date', 'Case Priority Category', 'Case Priority Country', 'Case Approved Date', 'Case Valid From', 'Case Valid To', 'Case Closed Date', 'Case Denied Date', 'Case Withdrawn Date', 'GT Representative']
+
+    #     #headers_table2 = ['BeneficiaryXref','OrganizationName','PetitionerName','Primary_Petitioner','BeneficiaryType','SourceCreatedDate','BeneficiaryRecordStatus','InactiveDate','EmployeeId','LastName','FirstName','MiddleName','PrimaryBeneficiaryXref','PrimaryBeneficiaryLastName','PrimaryBeneficiaryFirstName','RelationType','ImmigrationStatus','ImmigrationStatusExpirationDate','MostRecentI797IssueApprovalDate','MostRecentI797Status','I797ExpirationDate','FinalNivDate','MaxOutDateNote','CaseXref','CaseSourceCreatedDate','CasePetitionName', 'CaseDescription','CaseFiledDate','ReceiptNumber','ReceiptStatus','RFEAuditReceivedDate','RFEAuditDueDate','RFEAuditSubmittedDate', 'PrimaryCaseStatus','SecondaryCaseStatus','CaseComments','LastStepCompleted','LastStepCompletedDate','NextStepAction','NextStepActionDueDate','PriorityDate','PriorityCategory','PriorityCountry','CaseApprovedDate','CaseValidFromDate','CaseExpirationDate','CaseClosedDate','CaseDeniedDate','CaseWithdrawnDate','CasePrimaryCaseManager']
+
+    #     #date_columns2 = ['SourceCreatedDate', 'InactiveDate', 'ImmigrationStatusExpirationDate', 'MostRecentI797IssueApprovalDate', 'I797ExpirationDate', 'FinalNivDate', 'CaseSourceCreatedDate', 'CaseFiledDate','RFEAuditReceivedDate','RFEAuditDueDate','RFEAuditSubmittedDate', 'LastStepCompletedDate','NextStepActionDueDate','PriorityDate', 'CaseApprovedDate','CaseValidFromDate','CaseExpirationDate','CaseClosedDate','CaseDeniedDate','CaseWithdrawnDate']
+        
+    #     #done
+    #     headers2 = ['Petitioner of Primary Beneficiary', 'Beneficiary Last Name', 'Beneficiary First Name', 'Primary Beneficiary Last Name', 'Primary Beneficiary First Name', 'Relation', 'Immigration Status (I-94)', 'Immigration Status Expiration Date (I-94)', 'I-797 Expiration Date', 'Final NIV (Maxout) Date', 'Maxout Date Applicability and Note', 'Case Created Date', 'Case Description', 'Primary Case Status', 'Secondary Case Status', 'Case Comments', 'Case Last Step Completed', 'Case Last Step Completed Date', 'Case Primary Attorney', 'Reviewing Attorney', 'GT Representative']
+
+    #     headers_table2 = []
+
+
+    #     date_columns2 = ['ImmigrationStatusExpirationDate', 'I797ExpirationDate', 'FinalNivDate', 'CaseSourceCreatedDate', 'CaseFiledDate', 'LastStepCompletedDate','NextStepActionDueDate','PriorityDate', 'CaseApprovedDate']
+
+        
+    if True:
+        #headers2 = ['Beneficiary Id', 'Organization Name', 'Petitioner Name', 'Petitioner of Primary Beneficiary', 'Beneficiary Type (Employee / Dependent)', 'Beneficiary Record Creation Date', 'Beneficiary Record Status', 'Beneficiary Record Inactivation Date', 'Beneficiary Employee Id', 'Beneficiary Last Name', 'Beneficiary First Name', 'Beneficiary Middle Name', 'Primary Beneficiary Id', 'Primary Beneficiary Last Name', 'Primary Beneficiary First Name', 'Relation', 'Immigration Status (I-94)', 'Immigration Status Expiration Date (I-94)', 'I-797 Approved Date', 'I-797 Status', 'I-797 Expiration Date', 'Final NIV (Maxout) Date', 'Maxout Date Applicability and Note', 'Case Id', 'Case Created Date', 'Case Petition Name', 'Case Description', 'Case Filed Date', 'Case Receipt Number', 'Case Receipt Status', 'RFE/Audit Received Date', 'RFE/Audit Response Due Date', 'RFE/Audit Response Submitted Date', 'Primary Case Status', 'Secondary Case Status', 'Case Comments', 'Case Last Step Completed', 'Case Last Step Completed Date', 'Case Priority Date', 'Case Priority Category', 'Case Priority Country', 'Case Approved Date', 'Case Valid From', 'Case Valid To', 'Case Closed Date', 'Case Denied Date', 'Case Withdrawn Date', 'GT Representative']
+
+        #headers_table2 = ['BeneficiaryXref','OrganizationName','PetitionerName','Primary_Petitioner','BeneficiaryType','SourceCreatedDate','BeneficiaryRecordStatus','InactiveDate','EmployeeId','LastName','FirstName','MiddleName','PrimaryBeneficiaryXref','PrimaryBeneficiaryLastName','PrimaryBeneficiaryFirstName','RelationType','ImmigrationStatus','ImmigrationStatusExpirationDate','MostRecentI797IssueApprovalDate','MostRecentI797Status','I797ExpirationDate','FinalNivDate','MaxOutDateNote','CaseXref','CaseSourceCreatedDate','CasePetitionName', 'CaseDescription','CaseFiledDate','ReceiptNumber','ReceiptStatus','RFEAuditReceivedDate','RFEAuditDueDate','RFEAuditSubmittedDate', 'PrimaryCaseStatus','SecondaryCaseStatus','CaseComments','LastStepCompleted','LastStepCompletedDate','PriorityDate','PriorityCategory','PriorityCountry','CaseApprovedDate','CaseValidFromDate','CaseExpirationDate','CaseClosedDate','CaseDeniedDate','CaseWithdrawnDate','CasePrimaryCaseManager']
+
+        #date_columns2 = ['SourceCreatedDate', 'InactiveDate', 'ImmigrationStatusExpirationDate', 'MostRecentI797IssueApprovalDate', 'I797ExpirationDate', 'FinalNivDate', 'CaseSourceCreatedDate', 'CaseFiledDate','RFEAuditReceivedDate','RFEAuditDueDate','RFEAuditSubmittedDate', 'LastStepCompletedDate','PriorityDate', 'CaseApprovedDate','CaseValidFromDate','CaseExpirationDate','CaseClosedDate','CaseDeniedDate','CaseWithdrawnDate']
+        
+        headers2 = ['Petitioner of Primary Beneficiary', 'Beneficiary Last Name', 'Beneficiary First Name', 'Primary Beneficiary Last Name', 'Primary Beneficiary First Name', 'Relation', 'Immigration Status (I-94)', 'Immigration Status Expiration Date (I-94)', 'I-797 Expiration Date', 'Final NIV (Maxout) Date', 'Maxout Date Applicability and Note', 'Case Created Date', 'Case Description', 'Primary Case Status', 'Secondary Case Status', 'Case Comments', 'Case Last Step Completed', 'Case Last Step Completed Date', 'Case Primary Attorney', 'Reviewing Attorney', 'GT Representative']
+
+        headers_table2 = ['PetitionerofPrimaryBeneficiary', 'LastName', 'FirstName', 'PrimaryBeneficiaryLastName', 'PrimaryBeneficiaryFirstName', 'RelationType', 'ImmigrationStatus', 'ImmigrationStatusExpirationDate', 'I797ExpirationDate', 'FinalNivDate', 'MaxOutDateNote', 'SourceCreatedDate', 'CaseDescription', 'PrimaryCaseStatus', 'SecondaryCaseStatus', 'CaseComments', 'LastStepCompleted', 'LastStepCompletedDate', 'CasePrimaryAttorney', 'CaseReviewingAttorney', 'CasePrimaryCaseManager']
+
+
+        date_columns2 = ['ImmigrationStatusExpirationDate', 'I797ExpirationDate', 'FinalNivDate', 'CaseSourceCreatedDate','SourceCreatedDate', 'CaseFiledDate', 'LastStepCompletedDate','PriorityDate', 'CaseApprovedDate']
+        
+
+    
+    query = '''select b.IsActive,b.PetitionerofPrimaryBeneficiary,b.LastName,b.FirstName,b.PrimaryBeneficiaryLastName,b.PrimaryBeneficiaryFirstName,b.RelationType,b.ImmigrationStatus,b.ImmigrationStatusExpirationDate,b.I797ExpirationDate,b.FinalNivDate,b.MaxOutDateNote,c.SourceCreatedDate,c.CaseDescription,c.PrimaryCaseStatus,c.SecondaryCaseStatus,c.CaseComments,c.LastStepCompleted,c.LastStepCompletedDate,c.CasePrimaryAttorney,c.CaseReviewingAttorney,c.CasePrimaryCaseManager
+
+    from dbo.Beneficiary b 
+    left join dbo.[Case] c on b.BeneficiaryId = c.BeneficiaryId
+    left join dbo.Petitioner p on b.PetitionerId = p.PetitionerId
+    where b.IsActive = 1 and c.PrimaryCaseStatus = 'Open' and  c.CasePrimaryAttorney = 'Julia Holod' or c.CaseReviewingAttorney = 'Julia Holod' or c.CaseWorkerPrimaryFullName = 'Julia Holod' 
+    ORDER BY b.PetitionerofPrimaryBeneficiary ASC'''
+
+    query_result = cursor.execute(query).fetchall()
+
+    
+    df2 = pd.read_sql(query, conn)
+    for dfcol in df2.columns:
+        if dfcol not in headers_table2:
+            #df2.pop(dfcol)
+            df2.drop(dfcol, axis=1, inplace=True)
+
+    # altering the DataFrame - Column order
+    df2 = df2[headers_table2]
+    for d_h in date_columns2:
+        if d_h in df2:
+            if "1900-01-01" in df2[d_h]:
+                df2[d_h] = ""
+            else:
+                df2[d_h] = pd.to_datetime(df2[d_h], format='%Y-%m-%d', errors='coerce').dt.date
+    df2.columns = headers2 #changing dataframe all column names
+
+    # #columns to be removed
+    # remove_col = ['BeneficiaryId','BeneficiaryXref','PrimaryBeneficiaryXref','InactiveDate','OrganizationName','','','','','','']
+
+    # for i in df2.columns:
+    #     if i in remo
+
+    df2.to_excel(writer, "Open_Cases", startrow=0, columns=headers2, index=False)
+    writer.save()
+
+    #styling part
+
+    wb_pyxl = load_workbook(open_case_path)  
+    wb_pyxl.active = 0 #active first sheet
+    sheet = wb_pyxl.active
+    for hdr in headers_table2:
+        col = headers_table2.index(hdr)
+        sheet.cell(row=1, column=col+1).alignment=Alignment(wrap_text=True, horizontal="justify", vertical="justify")
+        sheet.column_dimensions[get_column_letter(col+1)].width = 14
+    
+    if sheet.max_row > 1:
+        table = Table(displayName="Table1", ref="A1:" + get_column_letter(sheet.max_column) + str(sheet.max_row))
+    else:
+        table = Table(displayName="Table1", ref="A1:" + get_column_letter(sheet.max_column) + str(2))
+    style = TableStyleInfo(name="TableStyleMedium2", showFirstColumn=False,
+                       showLastColumn=False, showRowStripes=True, showColumnStripes=False)
+    table.tableStyleInfo = style
+    sheet.add_table(table)
+    
+    if len(query_result) > 0:
+        for _key, s in enumerate(query_result):
+            
+            num = _key+1
+            
+            for hdr in headers_table2:
+                col = headers_table2.index(hdr)
+                
+                if hdr:
+                    value_obj = str(getattr(s, hdr))
+                else: 
+                    value_obj = ''
+                
+                if hdr in date_columns2:
+                    ##print(value_obj)
+                    value_obj = str(value_obj)
+                    if str(value_obj) == '1900-01-01 00:00:00':
+                        value_obj = ''
+                        sheet.cell(row=int(num)+1, column=col+1).value = ''
+                    else:
+                        value_obj = change_display_format(str(value_obj).replace('00:00:00', ''))
+
+                    if value_obj is None or value_obj == "None" or value_obj == "nan":
+                        value_obj = ''
+
+                    #sheet.cell(row=int(num) + 1, column=col + 1).value = str(value_obj)
+                    sheet.cell(row=int(num) + 1, column=col + 1).alignment = Alignment(wrap_text=True, horizontal="justify",
+                                                                                       vertical="justify")
+                    sheet.cell(row=int(num) + 1, column=col + 1).number_format = 'mm/dd/yyyy'
+                    sheet.cell(row=int(num) + 1, column=col + 1).font = Font(name='Calibri (Body)', size=11)
+                    sheet.cell(row=int(num) + 1, column=col + 1).border = Border(left=Side(style='thin'),
+                                                                                 right=Side(style='thin'),
+                                                                                 top=Side(style='thin'),
+                                                                                 bottom=Side(style='thin'))
+                    
+
+                else:
+                    
+                    if value_obj is None or value_obj == "None" or value_obj == "nan":
+                        value_obj = ''
+
+                    sheet.cell(row=int(num)+1, column = int(col)+1).value = str(value_obj) 
+                    sheet.cell(row=int(num)+1, column=col+1).alignment=Alignment(wrap_text=True, horizontal="justify", vertical="justify")
+                    sheet.cell(row=int(num)+1, column=col+1).font= Font(name = 'Calibri (Body)', size= 11)
+                    sheet.cell(row=int(num)+1, column=col+1).border= Border(left=Side(style='thin'), right=Side(style='thin'), top=Side(style='thin'), bottom=Side(style='thin'))
+                    
+                    pass
+                
+            #return False
+        else:
+            sheet.cell(row=2, column = 1).value = "No Records Found"
+        
+    wb_pyxl.save(open_case_path)
+    ###########
+
 
 
 def process_report(result_filepath, o_xref, p_xref, client_short_name, case_data_confirm):
@@ -2915,9 +3513,10 @@ def process_report(result_filepath, o_xref, p_xref, client_short_name, case_data
     wb_pyxl.active = 0 #active First sheet
     wb_pyxl.save(result_filepath)
 
+    
 
 
-def send_email(filename, results, filename2, send_exp_report, client_short_name):
+def send_email(filename, results, client_short_name, filename2=None, send_exp_report=None):
 
     length = len(results)
     if length > 0:
@@ -2940,7 +3539,9 @@ def send_email(filename, results, filename2, send_exp_report, client_short_name)
                 if ENVIRONMENT == "PRODUCTION":
                     receivers_mail = ('shiv@immilytics.com').split(';')
                     receivers_cc_mail = ('shiv@immilytics.com').split(';')
-                
+                else:
+                    receivers_mail = ('vigneshwarvj@gmail.com').split(';')
+                    receivers_cc_mail = ('vigneshwarvj@gmail.com').split(';')
                 
             body = """
             <html>
@@ -3012,7 +3613,6 @@ def send_email(filename, results, filename2, send_exp_report, client_short_name)
 if __name__ == '__main__':
     visaBulletinCheck()
     start()
-    generate_report()
     print('Finished')
     pass
     
