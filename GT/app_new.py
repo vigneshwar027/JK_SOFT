@@ -36,7 +36,7 @@ os.chdir(cwd)
 
 #choices
 ENVIRONMENT = 'DEVELOPMENT' #DEVELOPMENT/PRODUCTION
-SEND_MAIL = 'NO' #YES/NO
+SEND_MAIL = 'YES' #YES/NO
 SEND_MAIL_TO_CLIENT = 'NO' #YES/NO
 DB_ENCRYPTION = 'NO' #YES/NO
 
@@ -380,7 +380,8 @@ def start():
 
                 process_open_case_file('Source Data/'+open_case_file_name, from_name, Beneficiary_exists)
                
-        generate_open_case_report(todate)
+        generate_report('for open_cases')
+
     #if from_name:
     #    print('Generating Report - '+from_name)
     #    generate_case_report()
@@ -1659,8 +1660,7 @@ def process_open_case_file(file_path, from_name, Beneficiary_exists):
 
 
                 
-def generate_report():
-    
+def generate_report(for_open_cases = None):
     
     fernet_key = b'zJD8OVkFNpd5N4fJw6pqaWiDrvybkselSQ0fF9SwXfw='
     fernet = Fernet(fernet_key)
@@ -1770,29 +1770,47 @@ def generate_report():
                         if lengthb > 0:
                             case_data_confirm = True
                 
-                if beneficiary_id is not None and case_data_confirm == True:
-                    print(client_short_name)
+                if True:
+
                     result_filepath = str(client_short_name)+'_'+str(report_name)+'_'+str(todate)+'.xlsx'
                     result_filepath_folder = 'Processed Reports/'+str(client_short_name)+'_'+str(report_name)+'_'+str(todate)+'.xlsx'
                     
-                    #result path for open cases
-                    result_filepath_folder_oc = 'Processed Reports/'+'Opencases'+'_'+'juliana'+'_'+str(todate)+'.xlsx'
-                    process_report(result_filepath_folder, o_xref, p_xref, str(client_short_name), case_data_confirm)
-                    print('Case Report Generated for '+str(client_short_name))
-                    # Output Report Name: Open Cases_Julia Holod_ddmmyyyy
-
                     result_filepath_folder2 = 'Processed Reports/'+str(client_short_name)+'_Document Expiration Report_'+str(todate)+'.xlsx'
                     result_filepath2 = str(client_short_name)+'_Document Expiration Report_'+str(todate)+'.xlsx'
-                    send_exp_report = generate_expiration_report(todate, data_o, o_xref, p_xref, result_filepath_folder2)
 
-                   
-                    if SEND_MAIL == "YES":
-                        print('Sending Mail to client '+str(client_short_name))
-                        send_email(result_filepath, data_o, result_filepath2, send_exp_report, client_short_name)
+                    if for_open_cases==None:
+                        if beneficiary_id is not None and case_data_confirm == True:
+                            print('Processing for Client: ',client_short_name)
+                        
+                            #the below code creates the excel in the o/p folder
+                            process_report(result_filepath_folder, o_xref, p_xref, str(client_short_name), case_data_confirm)
+                            print('Case Report Generated for '+str(client_short_name))
+                            
+                            send_exp_report = generate_expiration_report(todate, data_o, o_xref, p_xref, result_filepath_folder2)
+
+                            if SEND_MAIL == "YES":
+                                print('Sending Mail to client '+str(client_short_name))
+                                
+                                send_email(result_filepath, data_o, client_short_name, result_filepath2, send_exp_report)
+                                
+                            else:
+                                update_log(client_short_name, 'Send Mail Disabled', result_filepath, result_filepath2, '')
+
                     else:
-                        update_log(client_short_name, 'Send Mail Disabled', result_filepath, result_filepath2, '' )
-                    print('')
+                        # for opencases report:
+                        result_filepath3 = 'Open Cases_Julia Holod_'+str(todate)+'.xlsx'
+                        if client_short_name == 'Julia':
+                            print('Processing for Client: ',client_short_name)
+                            generate_open_case_report(todate)
+                            print('Opencase report Successfully generated for Client '+str(client_short_name))
 
+                            if SEND_MAIL == "YES":
+                                print('Sending Opencase report Mail to client '+str(client_short_name))
+                                send_email(result_filepath3, data_o,client_short_name)
+                            else:
+                                update_log(client_short_name, 'Send Mail Disabled', result_filepath3, '')
+
+                    
 def generate_expiration_report(todate='', results_client='', o_xref='', p_xref='', result_filepath=''):
     client_short_name = results_client.clientShortName
     report_name = results_client.report_name
@@ -2236,14 +2254,10 @@ def generate_open_case_report(todate):
                         value_obj = ''
 
                     #sheet.cell(row=int(num) + 1, column=col + 1).value = str(value_obj)
-                    sheet.cell(row=int(num) + 1, column=col + 1).alignment = Alignment(wrap_text=True, horizontal="justify",
-                                                                                       vertical="justify")
+                    sheet.cell(row=int(num) + 1, column=col + 1).alignment = Alignment(wrap_text=True, horizontal="justify",  vertical="justify")
                     sheet.cell(row=int(num) + 1, column=col + 1).number_format = 'mm/dd/yyyy'
                     sheet.cell(row=int(num) + 1, column=col + 1).font = Font(name='Calibri (Body)', size=11)
-                    sheet.cell(row=int(num) + 1, column=col + 1).border = Border(left=Side(style='thin'),
-                                                                                 right=Side(style='thin'),
-                                                                                 top=Side(style='thin'),
-                                                                                 bottom=Side(style='thin'))
+                    sheet.cell(row=int(num) + 1, column=col + 1).border = Border(left=Side(style='thin'),right=Side(style='thin'),top=Side(style='thin'),bottom=Side(style='thin'))
                     
 
                 else:
@@ -2259,13 +2273,13 @@ def generate_open_case_report(todate):
                     pass
                 
             #return False
-        else:
-            sheet.cell(row=2, column = 1).value = "No Records Found"
+    else:
+        sheet.cell(row=2, column = 1).value = "No Records Found"
         
     wb_pyxl.save(open_case_path)
     ###########
 
-    
+
 
 def process_report(result_filepath, o_xref, p_xref, client_short_name, case_data_confirm):
     if o_xref:
@@ -3503,7 +3517,7 @@ def process_report(result_filepath, o_xref, p_xref, client_short_name, case_data
     
 
 
-def send_email(filename, results, filename2, send_exp_report, client_short_name):
+def send_email(filename, results, client_short_name, filename2=None, send_exp_report=None):
 
     length = len(results)
     if length > 0:
@@ -3526,7 +3540,9 @@ def send_email(filename, results, filename2, send_exp_report, client_short_name)
                 if ENVIRONMENT == "PRODUCTION":
                     receivers_mail = ('shiv@immilytics.com').split(';')
                     receivers_cc_mail = ('shiv@immilytics.com').split(';')
-                
+                else:
+                    receivers_mail = ('vigneshwarvj@gmail.com').split(';')
+                    receivers_cc_mail = ('vigneshwarvj@gmail.com').split(';')
                 
             body = """
             <html>

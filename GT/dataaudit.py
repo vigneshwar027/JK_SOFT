@@ -33,8 +33,8 @@ from cryptography.fernet import Fernet
 cwd = os.path.dirname(os.path.realpath(__file__))
 os.chdir(cwd)
 
-ENVIRONMENT = 'PRODUCTION' #DEVELOPMENT/PRODUCTION
-SEND_MAIL = 'YES' #YES/NO
+ENVIRONMENT = 'DEVELOPMENT' #DEVELOPMENT/PRODUCTION
+SEND_MAIL = 'NO' #YES/NO
 DB_ENCRYPTION = 'NO' #YES/NO
 
 fernet_key = b'zJD8OVkFNpd5N4fJw6pqaWiDrvybkselSQ0fF9SwXfw='
@@ -49,7 +49,7 @@ if ENVIRONMENT == 'PRODUCTION':
     driver_path = os.path.join('C:\ImmiLytics\Automation_UiPath', "chromedriver.exe")
 else:
     conn = pyodbc.connect('Driver={ODBC Driver 17 for SQL Server};'
-                      'Server=localhost;'
+                      'Server=localhost\SQLEXPRESS;'
                       'Database=ReportsAutomation2;'
                       'Trusted_Connection=yes;')
     driver_path = ("chromedriver.exe")
@@ -64,6 +64,7 @@ def truncate_all():
     truncate table [Petitioner];\
     truncate table [Organization];")
     cursor.commit()
+
 
 def change_format(date):
     #print('date', date)
@@ -80,10 +81,13 @@ def change_format(date):
                 try:
                     return datetime.strptime(date, "%m/%d/%Y").strftime('%Y-%m-%d')
                 except: 
-                    
-                    return datetime.strptime('', "%m/%d/%Y").strftime('%Y-%m-%d')
+                    try:
+                        return datetime.strptime(date, "%m-%d-%Y").strftime('%Y-%m-%d')
+                    except:
+                        return datetime.strptime('', "%m/%d/%Y").strftime('%Y-%m-%d')
     else:
         return date
+
 
 def change_display_format(date):
     date = str(date).strip()
@@ -93,6 +97,8 @@ def change_display_format(date):
         except:
             return date
     
+
+
 
 def start():
     truncate_all()
@@ -158,7 +164,7 @@ def process_beneficiary_file(file_path, from_name):
 
         WorkEmail = ''
         if "Beneficiary Work Email Address" in list_h and not pd.isna(row["Beneficiary Work Email Address"]):
-                WorkEmail = str(row["Beneficiary Work Email Address"]).strip()
+                WorkEmail = str(row["Beneficiary Work Email Address"]).replace("'","''").strip()
 
                 
         organization_xref = ''
@@ -1034,7 +1040,7 @@ def generate_report():
     result_filepath = 'GT Audit Report_'+str(todate)+'.xlsx'
     result_filepath_folder = 'Processed Reports/'+str(result_filepath)
     process_report(result_filepath_folder, case_data_confirm)
-    print('Audit Report Generated')
+    print('\nAudit Report Generated')
     if SEND_MAIL == "YES":
         print('Sending Mail')
         send_email(result_filepath)

@@ -1,8 +1,7 @@
-def fun(age=None):
-    if age:
-        print('hi')
-    else:
-        print('bye')
+a = 5
+b = 3
 
-
-fun('fsd')
+if a == 6 and b == 3:
+    print('hi')
+else:
+    print('hello')

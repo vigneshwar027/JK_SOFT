@@ -456,7 +456,7 @@ def process_beneficiary_file(file_path, from_name):
             ead_expiration_date = ''
             if "ead_exp_date" in list_h and str(row["ead_exp_date"]).strip() and not pd.isna(row["ead_exp_date"]):
                 ead_expiration_date = change_format(row["ead_exp_date"])
-
+            
             ap_valid_from = ''
             if "AP Valid From" in list_h and row["AP Valid From"].strip() and not pd.isna(row["AP Valid From"]):
                 ap_valid_from = change_format(row["AP Valid From"])
@@ -1080,7 +1080,7 @@ def process_case_file(file_path, from_name):
                 
                 case_filed_date = ''
                 if "filed_date" in list_h and row["filed_date"] and not pd.isna(row["filed_date"]):
-                    case_filed_date = change_format(row["filed_date"])
+                    case_filed_date = change_format(row["filed_date"].replace('00:00:00', ''))
                 
                 
                 case_receipt_number = ''
@@ -1131,7 +1131,7 @@ def process_case_file(file_path, from_name):
                 case_last_step_completed_date = ''
                 if "last_process_activity_date" in list_h and row["last_process_activity_date"] and not pd.isna(row["last_process_activity_date"]):
                     case_last_step_completed_date = change_format(row["last_process_activity_date"])
-
+                print('fdsfs',case_last_step_completed_date) 
                 case_next_step_to_be_completed = ''
                 if "next_unfinished_reminder_subject" in list_h and not pd.isna(row["next_unfinished_reminder_subject"]):
                     case_next_step_to_be_completed = str(str(row["next_unfinished_reminder_subject"]).strip()).replace("'", "")
@@ -1140,7 +1140,7 @@ def process_case_file(file_path, from_name):
                 
                 case_next_step_to_be_completed_date = ''
                 if "next_unfinished_reminder_expiry" in list_h and row["next_unfinished_reminder_expiry"] and not pd.isna(row["next_unfinished_reminder_expiry"]):
-                    case_next_step_to_be_completed_date = change_format(row["next_unfinished_reminder_expiry"])
+                    case_next_step_to_be_completed_date = change_format(row["next_unfinished_reminder_expiry"]).replace('00:00:00', '')
                 
                 case_priority_date = ''
                 if "Case Priority Date" in list_h and row["Case Priority Date"] and not pd.isna(row["Case Priority Date"]):
@@ -2100,7 +2100,7 @@ def Paralegal(result_filepath4):
     headers_table = ['FullName', 'Beneficiary_Xref2', 'PetitionerofPrimaryBeneficiary', 'BirthCountry', 'ImmigrationStatus', 'ImmigrationStatusExpirationDate', 'I94ExpirationDate', 'I797ExpirationDate', 'FinalNivDate', 'EadExpirationDate', 'AdvanceParoleExpirationDate', 'SpecialInstructionInfo', 'SpecialInstructionFlag', 'SourceCreatedDate', 'CaseId', 'CasePetitionName', 'CaseType', 'targetfiledate', 'CaseComments', 'LastStepCompleted', 'LastStepCompletedDate', 'DaysSinceLastStepCompleted', 'NextStepAction', 'NextStepActionDueDate', 'PriorityDate1Date', 'PriorityDate1Category', 'PriorityDate1Note', 'petitionfiledwithcis', 'CaseFiledDate', 'applicationfiled', 'formi129filedwithcis', 'form9089submittedtodol', 'aosapplicationfiled', 'RFEAuditDueDate', 'RFEAuditSubmittedDate', 'AssociateName','ParalegalName']
 
 
-    date_columns = ["EmploymentStartDate","CurrentImmigrationStatusExpirationDate2","I797ExpirationDate","ImmigrationStatusExpirationDate","EadExpirationDate","AdvanceParoleExpirationDate","FinalNivDate","Priority1Date","SourceCreatedDate","questionnairessenttofn","fncompletedquestionnairesandacknowledgement","allfndocsreceived","lcafiled","lcacertified","formsanddocumentationsubmittedforsignature","applicationfiled","petitionfiledwithcis","CaseReceivedDate","RFEAuditReceivedDate","RFEAuditDueDate","RFEDocsReceivedDate","RFEAuditSubmittedDate","CaseValidFromDate","CaseExpirationDate","CaseClosedDate","DaysSinceLastStepCompleted"]
+    date_columns = ["EmploymentStartDate","CurrentImmigrationStatusExpirationDate2","I797ExpirationDate","ImmigrationStatusExpirationDate","EadExpirationDate","AdvanceParoleExpirationDate","FinalNivDate","Priority1Date","SourceCreatedDate","questionnairessenttofn","fncompletedquestionnairesandacknowledgement","allfndocsreceived","lcafiled","lcacertified","formsanddocumentationsubmittedforsignature","applicationfiled","petitionfiledwithcis","CaseReceivedDate","RFEAuditReceivedDate","RFEAuditDueDate","RFEDocsReceivedDate","RFEAuditSubmittedDate","CaseValidFromDate","CaseExpirationDate","CaseClosedDate","DaysSinceLastStepCompleted",'LastStepCompletedDate','NextStepActionDueDate','applicationfiled','CaseFiledDate']
 
 
     header_names = [{'header': x} for x in headers]
@@ -2217,7 +2217,7 @@ def InternalPerm(result_filepath5):
 
     headers_table = ['FullName', 'Beneficiary_Xref2', 'PetitionerofPrimaryBeneficiary', 'BirthCountry', 'ImmigrationStatus', 'ImmigrationStatusExpirationDate', 'I94ExpirationDate', 'I797ExpirationDate', 'FinalNivDate', 'EadExpirationDate', 'AdvanceParoleExpirationDate', 'SpecialInstructionInfo', 'SpecialInstructionFlag', 'SourceCreatedDate', 'CaseId', 'CasePetitionName', 'CaseType', 'targetfiledate', 'CaseComments', 'LastStepCompleted', 'LastStepCompletedDate', 'DaysSinceLastStepCompleted', 'NextStepAction', 'NextStepActionDueDate', 'petitioningjobtitle', 'petitioningjoblocation', 'questionnairessenttofn', 'followupwithfnforrequestedinformation', 'questionnairecompletedandreturnedbymanager', 'questionnairecompletedandreturnedbyfn', 'permmemosenttoemployer', 'approvalofpermmemoreceived', 'employeeworkexperiencechartsent', 'employeeworkexperiencechartreceived', 'employmentverificationletterssenttoemployee', 'signedemploymentverificationlettersreceived', 'prevailingwagedeterminationrequestsubmittedtodol', 'prevailingwagedeterminationissuedbydol', 'recruitmentinstructionssenttocompany', 'joborderplacedwithswa', 'noticeoffilingposted', 'intranetnoticeoffilingposted', 'noticeoffilingremovedsigned', 'intranetnoticeoffilingremoved', '_1stsundayadplaced', '_2ndsundayadplaced', '_1stadditionalrecruitmentstepplaced', '_2ndadditionalrecruitmentstepplaced', '_3rdadditionalrecruitmentstepplaced', 'datedcopiesofallrecruitmentreceived', 'completedevaluationquestionnairesandresumesreceived', 'form9089senttofnandemployer', 'editstoform9089receivedfromfnandemployer', 'form9089submittedtodol', 'AssociateName', 'ParalegalName']
     
-    date_columns = ["EmploymentStartDate","CurrentImmigrationStatusExpirationDate2","I797ExpirationDate","ImmigrationStatusExpirationDate","EadExpirationDate","AdvanceParoleExpirationDate","FinalNivDate","Priority1Date","SourceCreatedDate","questionnairessenttofn","fncompletedquestionnairesandacknowledgement","allfndocsreceived","lcafiled","lcacertified","formsanddocumentationsubmittedforsignature","applicationfiled","petitionfiledwithcis","CaseReceivedDate","RFEAuditReceivedDate","RFEAuditDueDate","RFEDocsReceivedDate","RFEAuditSubmittedDate","CaseValidFromDate","CaseExpirationDate","CaseClosedDate","DaysSinceLastStepCompleted"]
+    date_columns = ["EmploymentStartDate","CurrentImmigrationStatusExpirationDate2","I797ExpirationDate","ImmigrationStatusExpirationDate","EadExpirationDate","AdvanceParoleExpirationDate","FinalNivDate","Priority1Date","SourceCreatedDate","questionnairessenttofn","fncompletedquestionnairesandacknowledgement","allfndocsreceived","lcafiled","lcacertified","formsanddocumentationsubmittedforsignature","applicationfiled","petitionfiledwithcis","CaseReceivedDate","RFEAuditReceivedDate","RFEAuditDueDate","RFEDocsReceivedDate","RFEAuditSubmittedDate","CaseValidFromDate","CaseExpirationDate","CaseClosedDate","DaysSinceLastStepCompleted",'LastStepCompletedDate','NextStepActionDueDate','applicationfiled','CaseFiledDate']
 
 
     header_names = [{'header': x} for x in headers]
@@ -2236,7 +2236,7 @@ def InternalPerm(result_filepath5):
     
     df = pd.read_sql(results_active_qry, conn)
     for dfcol in df.columns:
-        if dfcol not in headers_table:
+        if dfcol not in headers_table :
             df.drop(dfcol, axis=1, inplace=True)
     
     # altering the DataFrame - Column order
